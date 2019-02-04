@@ -72,11 +72,9 @@ class AttentionDecoder:
         h = hs_enc[:, -1]
         self.lstm.set_state(h)
         sampled = []
-        # char_id = start_id
         char_id = np.array(start_id).reshape(1, 1).repeat(N, axis=0)
 
         for _ in range(sample_size):
-            # x = np.array(char_id).reshape((1, 1))
             x = char_id
             out = self.embed.forward(x)
             hs_dec = self.lstm.forward(out)
@@ -84,12 +82,9 @@ class AttentionDecoder:
             out = np.concatenate((cs, hs_dec), axis=2)
             score = self.affine.forward(out)
 
-            # char_id = np.argmax(score.flatten())
             char_id = score.argmax(axis=2)
-            # sampled.append(char_id)
             sampled.append(char_id.flatten())
 
-        # return sampled
         return np.array(sampled).T
 
 class AttentionSeq2seq(Seq2seq):

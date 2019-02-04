@@ -113,7 +113,13 @@ class Trainer:
         ax2.grid(True)
         if image_path is not None:
             plt.savefig(image_path)
-        plt.show()
+        plt.show(block=False)
+
+    def clear(self):
+        self.current_epoch = 0
+        self.loss_list = []
+        self.err_train = []
+        self.err_test = []
 
 
 class RnnlmTrainer:

@@ -207,7 +207,65 @@ class TextSequence:
 
         return train_test_split(x, t, test_size=test_size, random_state=seed, shuffle=shuffle)
 
+    def cv_dataset_gen(self, x=None, t=None, test_size=0.2):
+        '''
+        交差検証用のデータセットを返すジェネレータ
+        test_sizeに応じてデータセットを分割し、
+        テストデータの位置を変えながら訓練データとテストデータを返す
+
+        Parameters
+        ----------
+        x : np.ndarray, optional
+            入力データ
+        t : np.ndarray, optional
+            教師データ
+        test_size : float, optional
+            テストデータのサイズ
+
+        Yields
+        ----------
+        x_train, x_test, t_train, t_test : np.ndarray * 4
+        '''
+
+        if not isinstance(x, np.ndarray) or x.ndim != 2:
+            x = self.vec_x
+        if not isinstance(t, np.ndarray) or t.ndim != 2:
+            t = self.vec_t
+
+        unit = int(x.shape[0] * test_size)
+        # kの値に応じてテストデータの位置を変える
+        for k in range(int(1 / test_size)):
+            x_train = np.r_[x[:unit*k], x[unit*(k+1):]]
+            t_train = np.r_[t[:unit*k], t[unit*(k+1):]]
+            x_test = x[unit*k:unit*(k+1)]
+            t_test = t[unit*k:unit*(k+1)]
+            yield x_train, x_test, t_train, t_test
+
+
     def result_to_csv(self, target_csv, vec_x, vec_t, vec_guess, encoding='utf-8'):
+        '''
+        推論結果から文字列へ変換し、正解判定もつけてCSVへ保存する
+
+        Parameters
+        ----------
+        target_csv : str or pathlib.Path
+            結果を保存するCSVファイルのパス
+        vec_x : np.ndarray
+            入力データの文字IDベクトル表現
+        vec_t : np.ndarray
+            教師データの文字IDベクトル表現
+        vec_guess : np.ndarray
+            推論結果の文字IDベクトル表現
+        encoding : str, optional
+            文字コード
+            データセットCSVと同じ文字コードにする
+
+        Returns
+        -------
+        pd.DataFrame
+            保存するCSVと同じフォーマットのDataFrame
+        '''
+
         # 文字列へ変換
         xs = self.vector_to_sequence(vec_x)
         ts = self.vector_to_sequence(vec_t)
