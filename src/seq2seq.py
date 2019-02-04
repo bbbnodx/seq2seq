@@ -154,23 +154,18 @@ class Decoder:
 
         sampled = []
         N = h.shape[0]
-        # char_id = start_id
         char_id = np.array(start_id).reshape(1, 1).repeat(N, axis=0)
         self.lstm.set_state(h)
 
         for _ in range(sample_size):
-            # x = np.array(char_id).reshape((1, 1))
             x = char_id
             out = self.embed.forward(x)
             out = self.lstm.forward(out)
             score = self.affine.forward(out)
 
-            # char_id = np.argmax(score.flatten())
-            # sampled.append(char_id)
             char_id = score.argmax(axis=2)
             sampled.append(char_id.flatten())
 
-        # return sampled
         return np.array(sampled).T
 
 class Seq2seq(BaseModel):
@@ -202,17 +197,56 @@ class Seq2seq(BaseModel):
         return dout
 
     def generate(self, xs, start_id, sample_size):
+        '''
+        入力データから推論を行い、推論結果の文字IDベクトルを得る
+
+        Parameters
+        ----------
+        xs : np.ndarray (N, input_size)
+            入力データのミニバッチ
+        start_id : int
+            開始文字ID
+        sample_size : int
+            出力文字列の長さ
+
+        Returns
+        -------
+        np.ndarray (N, sample_size)
+            推論結果の文字IDベクトルのミニバッチ
+        '''
+
         h = self.encoder.forward(xs)
         sampled = self.decoder.generate(h, start_id, sample_size)
+        # sampled, sum_cf = self.decoder.generate(h, start_id, sample_size)
 
         return sampled
+        # return sampled, sum_cf
 
     def validation(self, xs, ts):
+        '''
+        xsから推論を行い、tsと比較して正解数を返す
+
+        Parameters
+        ----------
+        xs : np.ndarray
+            入力のミニバッチ
+        ts : np.ndarray
+            教師データのミニバッチ
+
+        Returns
+        -------
+        int
+            正解数
+        '''
+
         start_id = ts[0, 0]
         correct = ts[:, 1:]
         sample_size = correct.shape[1]
 
         guess = self.generate(xs, start_id, sample_size)
+        # guess, _ = self.generate(xs, start_id, sample_size)
         # データごとの正解判定を得る
-        valid = reduce(np.logical_or, (correct != guess).T)
-        return valid.mean()
+        # 文字単位で正解判定を行い、行について論理積で畳み込んで系列単位の正解判定を得る
+        valid_sequence = reduce(np.logical_and, (correct == guess).T)
+        # 総和をとってバッチデータの正解数を返す
+        return valid_sequence.sum()

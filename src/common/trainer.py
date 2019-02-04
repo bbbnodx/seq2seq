@@ -61,20 +61,18 @@ class Trainer:
             def get_error_rate(xs, ts):
                 data_size = xs.shape[0]
                 max_iter, mod = divmod(data_size, batch_size)
-                acc_sum = 0
+                acc_count = 0  # 正答数
                 for iters in range(max_iter):
                     batch_x = xs[iters*batch_size:(iters+1)*batch_size]
                     batch_t =ts[iters*batch_size:(iters+1)*batch_size]
-                    # バッチ単位の正答率を加算していく
-                    acc_sum += self.model.validation(batch_x, batch_t)
-                acc_sum *= batch_size
+                    acc_count += self.model.validation(batch_x, batch_t)
                 # データサイズがバッチサイズで割りきれない場合
                 if mod > 0:
                     batch_x = xs[max_iter*batch_size:]
                     batch_t = ts[max_iter*batch_size:]
-                    acc_sum += self.model.validation(batch_x, batch_t) * batch_x.shape[0]
+                    acc_count += self.model.validation(batch_x, batch_t)
 
-                return acc_sum / data_size
+                return 1 - acc_count / data_size
 
             # loss, accuracyの算出と表示
             self.loss_list.append(avg_loss)
@@ -95,7 +93,8 @@ class Trainer:
         # 色の設定
         color_loss = 'blue'
         color_err = 'orange'
-        x = numpy.arange(1, len(self.loss_list)+1)
+        epoch_range = (1, len(self.loss_list)+1)
+        x = numpy.arange(epoch_range[0], epoch_range[1])
         ax1.plot(x, self.loss_list, color=color_loss, label='loss')
         ax2.plot(x, self.err_train, color=color_err, label='train error')
         ax2.plot(x, self.err_test, color=color_err, linestyle='dashed', label='test error')
@@ -103,10 +102,13 @@ class Trainer:
         ax2.tick_params(axis='y', colors=color_err)
         # 軸ラベル
         plt.xlabel('epoch')
-        ax1.set_ylabel('loss')
+        plt.xlim(epoch_range)
+        ax2.set_ylim((0.0, 1.0))
+        ax1.set_ylabel('Loss')
         ax2.set_ylabel('Error')
-        ax1.legend()
-        ax2.legend()
+        ax1.set_title("train error={:.5f}  test error={:.5f}".format(self.err_train[-1], self.err_test[-1]))
+        ax1.legend(bbox_to_anchor=(1, 1), loc='upper right')
+        ax2.legend(bbox_to_anchor=(1, 0.9), loc='upper right')
         #グリッド表示(ax2のみ)
         ax2.grid(True)
         if image_path is not None:

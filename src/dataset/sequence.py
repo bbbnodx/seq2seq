@@ -34,6 +34,18 @@ class TextSequence:
         return self.__t_prefix
 
     @property
+    def start_id(self):
+        return self.char_to_id[self.__t_prefix]
+
+    @property
+    def x_length(self):
+        return self.vec_x.shape[1]
+
+    @property
+    def t_length(self):
+        return self.vec_t.shape[1] - 1
+
+    @property
     def vocab(self):
         return self.char_to_id, self.id_to_char
 
@@ -163,6 +175,21 @@ class TextSequence:
 
         return df
 
+    def shuffle(self, x=None, t=None, seed=None):
+        if not isinstance(x, np.ndarray) or x.ndim != 2:
+            x = self.vec_x
+        if not isinstance(t, np.ndarray) or t.ndim != 2:
+            t = self.vec_t
+        nb_data = len(x)
+        indices = np.arange(nb_data)
+        if seed is not None:
+            np.random.seed(seed)
+        np.random.shuffle(indices)
+        x = x[indices]
+        t = t[indices]
+
+        return x, t
+
     def split_data(self, x=None, t=None, test_size=0.2, shuffle=True, seed=None):
         '''
         sklearn.model_selection.train_test_split()を呼び出して
@@ -180,7 +207,7 @@ class TextSequence:
 
         return train_test_split(x, t, test_size=test_size, random_state=seed, shuffle=shuffle)
 
-    def result_to_csv(self, target_csv, vec_x, vec_t, vec_guess):
+    def result_to_csv(self, target_csv, vec_x, vec_t, vec_guess, encoding='utf-8'):
         # 文字列へ変換
         xs = self.vector_to_sequence(vec_x)
         ts = self.vector_to_sequence(vec_t)
@@ -192,7 +219,7 @@ class TextSequence:
         print("Accuracy:", accuracy)
 
         df = pd.DataFrame({'x': xs, 'y': ts, 'guess': gs, 'correct': correct})
-        df.to_csv(target_csv, index=False)
+        df.to_csv(target_csv, index=False, encoding=encoding)
 
         return df
 
@@ -210,6 +237,6 @@ class TextSequence:
         if not isinstance(xs, np.ndarray) or xs.ndim != 2:
             raise ValueError('Argument "xs" is not word vector.')
         # 空白と開始文字('_')を除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
-        return [''.join([id_to_char[x]\
-                         for x in row if not id_to_char[x] in (' '+self.__t_prefix)])\
+        return [''.join([self.id_to_char[x]\
+                         for x in row if not self.id_to_char[x] in (' '+self.__t_prefix)])\
                 for row in xs]

@@ -1,6 +1,7 @@
 # coding: utf-8
 from common.time_layers import *
 from common.base_model import BaseModel
+from common.layers import Softmax
 from functools import partial
 from seq2seq import Encoder, Seq2seq, _init_parameter
 
@@ -114,13 +115,17 @@ class PeekyDecoder:
         concat = partial(np.concatenate, axis=2)
         N = h.shape[0]
         sampled = []
-        # char_id = start_id
         char_id = np.array(start_id).reshape(1, 1).repeat(N, axis=0)
         self.lstm.set_state(h)
 
+        ##########
+        # 確信度の取得用
+        # sum_cf = 0
+        # softmax = Softmax()
+        ##########
+
         peeky_h = h.reshape(N, 1, -1)
         for _ in range(sample_size):
-            # x = np.array(char_id).reshape((1, 1))
             x = char_id
             out = self.embed.forward(x)
             out = concat((peeky_h, out))
@@ -128,13 +133,21 @@ class PeekyDecoder:
             out = concat((peeky_h, out))
             score = self.affine.forward(out)
 
-            # char_id = np.argmax(score.flatten())
+            ##########
+            # score = softmax.forward(score)  # 確信度の取得
+            ##########
+
             char_id = score.argmax(axis=2)
-            # sampled.append(char_id)
             sampled.append(char_id.flatten())
 
-        # return sampled
+            ##########
+            # 確信度の加算
+            # cf = score.max(axis=2)
+            # sum_cf += cf.flatten()
+            ##########
+
         return np.array(sampled).T
+        # return np.array(sampled).T, sum_cf
 
 class PeekySeq2seq(Seq2seq):
     '''
