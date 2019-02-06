@@ -134,7 +134,7 @@ class Decoder:
 
     def generate(self, h, start_id, sample_size):
         '''
-        推論を実行し、文字IDのリストを返す
+        推論を実行し、文字IDベクトルを返す
 
         Parameters
         ----------
@@ -147,9 +147,9 @@ class Decoder:
 
         Returns
         -------
-        list
+        np.ndarray (N, sample_size)
             推論の結果
-            長さsample_sizeの文字IDリスト
+            長さsample_sizeの文字IDベクトル
         '''
 
         sampled = []
@@ -168,12 +168,70 @@ class Decoder:
 
         return np.array(sampled).T
 
+    def generate_with_cf(self, h, start_id, sample_size):
+        '''
+        推論を実行し、文字IDベクトルと確信度を返す
+
+        Parameters
+        ----------
+        h : ndarray
+            Encoderから受け取る隠れ状態
+        stard_id : int
+            開始文字のID
+        sample_size : int
+            出力文字列の最大長さ
+
+        Returns
+        -------
+        np.ndarray (N, sample_size)
+            推論の結果
+            長さsample_sizeの文字IDベクトル
+        np.ndarray (N, )
+            系列データごとの確信度
+        '''
+
+        sampled = []
+        N = h.shape[0]
+        char_id = np.array(start_id).reshape(1, 1).repeat(N, axis=0)
+        self.lstm.set_state(h)
+
+        ### 確信度の取得用 ###
+        sum_cf = 0
+        softmax = TimeSoftmax()
+        ##########
+
+        for _ in range(sample_size):
+            x = char_id
+            out = self.embed.forward(x)
+            out = self.lstm.forward(out)
+            score = self.affine.forward(out)
+            ### 確信度の取得 ###
+            score = softmax.forward(score)
+            ##########
+
+            char_id = score.argmax(axis=2)
+            sampled.append(char_id.flatten())
+
+            ### 確信度の加算 ###
+            sum_cf += score.max(axis=2).flatten()
+            ##########
+
+        cf = sum_cf / sample_size  # mean
+
+        return np.array(sampled).T, cf
+
+
 class Seq2seq(BaseModel):
+    '''
+    Seq2seqモデルのクラス
+    改良モデルの基底クラスでもあり、__init__以外のメソッドは共用する
+    '''
+
     def __init__(self, vocab_size, wordvec_size, hidden_size):
         V, D, H = vocab_size, wordvec_size, hidden_size
         self.encoder = Encoder(V, D, H)
         self.decoder = Decoder(V, D, H)
-        self.softmax = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss()
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads
@@ -185,12 +243,12 @@ class Seq2seq(BaseModel):
 
         h = self.encoder.forward(xs)
         score = self.decoder.forward(decoder_xs, h)
-        loss = self.softmax.forward(score, decoder_ts)
+        loss = self.loss.forward(score, decoder_ts)
 
         return loss
 
     def backward(self, dout=1):
-        dout = self.softmax.backward(dout)
+        dout = self.loss.backward(dout)
         dh = self.decoder.backward(dout)
         dout = self.encoder.backward(dh)
 
@@ -217,10 +275,34 @@ class Seq2seq(BaseModel):
 
         h = self.encoder.forward(xs)
         sampled = self.decoder.generate(h, start_id, sample_size)
-        # sampled, sum_cf = self.decoder.generate(h, start_id, sample_size)
 
         return sampled
-        # return sampled, sum_cf
+
+    def generate_with_cf(self, xs, start_id, sample_size):
+        '''
+        入力データから推論を行い、推論結果の文字IDベクトルと確信度を得る
+
+        Parameters
+        ----------
+        xs : np.ndarray (N, input_size)
+            入力データのミニバッチ
+        start_id : int
+            開始文字ID
+        sample_size : int
+            出力文字列の長さ
+
+        Returns
+        -------
+        np.ndarray (N, sample_size)
+            推論結果の文字IDベクトルのミニバッチ
+        np.ndarray (N, )
+            シーケンスごとの確信度
+        '''
+
+        h = self.encoder.forward(xs)
+        sampled, cf = self.decoder.generate_with_cf(h, start_id, sample_size)
+
+        return sampled, cf
 
     def validation(self, xs, ts):
         '''
@@ -236,7 +318,7 @@ class Seq2seq(BaseModel):
         Returns
         -------
         int
-            正解数
+            バッチデータにおける正解数
         '''
 
         start_id = ts[0, 0]
@@ -244,7 +326,6 @@ class Seq2seq(BaseModel):
         sample_size = correct.shape[1]
 
         guess = self.generate(xs, start_id, sample_size)
-        # guess, _ = self.generate(xs, start_id, sample_size)
         # データごとの正解判定を得る
         # 文字単位で正解判定を行い、行について論理積で畳み込んで系列単位の正解判定を得る
         valid_sequence = reduce(np.logical_and, (correct == guess).T)

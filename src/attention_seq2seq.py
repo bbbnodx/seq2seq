@@ -87,12 +87,45 @@ class AttentionDecoder:
 
         return np.array(sampled).T
 
+    def generate_with_cf(self, hs_enc, start_id, sample_size):
+        N= hs_enc.shape[0]
+        h = hs_enc[:, -1]
+        self.lstm.set_state(h)
+        sampled = []
+        char_id = np.array(start_id).reshape(1, 1).repeat(N, axis=0)
+
+        ### 確信度の取得用 ###
+        sum_cf = 0
+        softmax = TimeSoftmax()
+        ##########
+
+        for _ in range(sample_size):
+            x = char_id
+            out = self.embed.forward(x)
+            hs_dec = self.lstm.forward(out)
+            cs = self.attention.forward(hs_enc, hs_dec)
+            out = np.concatenate((cs, hs_dec), axis=2)
+            score = self.affine.forward(out)
+            ### 確信度の取得 ###
+            score = softmax.forward(score)
+            ##########
+
+            char_id = score.argmax(axis=2)
+            sampled.append(char_id.flatten())
+            ### 確信度の加算 ###
+            sum_cf += score.max(axis=2).flatten()
+            ##########
+
+        cf = sum_cf / sample_size  # mean
+
+        return np.array(sampled).T, cf
+
 class AttentionSeq2seq(Seq2seq):
     def __init__(self, vocab_size, wordvec_size, hidden_size):
         args = vocab_size, wordvec_size, hidden_size
         self.encoder = AttentionEncoder(*args)
         self.decoder = AttentionDecoder(*args)
-        self.softmax = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss()
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads

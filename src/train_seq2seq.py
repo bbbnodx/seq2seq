@@ -1,6 +1,7 @@
 # coding: utf-8
 import sys
 sys.path.append('..')
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -30,7 +31,7 @@ char_to_id, id_to_char = seq.vocab
 # ハイパーパラメータ
 vocab_size = len(char_to_id)
 wordvec_size = 64
-hidden_size = 256
+hidden_size = 128
 batch_size = 32
 max_epoch = 100
 max_grad = 5.0
@@ -39,8 +40,8 @@ max_grad = 5.0
 is_reverse = True
 
 x_train, x_test, t_train, t_test = seq.split_data(seed=1, test_size=0.1)
-if is_reverse:
-    x_train, x_test = x_train[:, ::-1], x_test[:, ::-1]
+# if is_reverse:
+#     x_train, x_test = x_train[:, ::-1], x_test[:, ::-1]
 
 # モデル選択
 # model = Seq2seq(vocab_size, wordvec_size, hidden_size)
@@ -51,7 +52,7 @@ optimizer = Adam()
 trainer = Trainer(model, optimizer)
 
 # Train
-trainer.fit(x_train, t_train, x_test, t_test,
+trainer.fit(x_train[:, ::-1], t_train, x_test[:, ::-1], t_test,
             max_epoch=max_epoch,
             batch_size=batch_size,
             max_grad=max_grad)
@@ -59,25 +60,31 @@ trainer.fit(x_train, t_train, x_test, t_test,
 # Inference
 start_id = seq.start_id
 sample_size = seq.t_length
-guess_train = model.generate(x_train, start_id, sample_size)
-guess_test = model.generate(x_test, start_id, sample_size)
+guess_train = model.generate(x_train[:, ::-1], start_id, sample_size)
+guess_test = model.generate(x_test[:, ::-1], start_id, sample_size)
 # guess_train, sum_cf_train = model.generate(x_train, start_id, sample_size)
 # guess_test, sum_cf_test = model.generate(x_test, start_id, sample_size)
 
+# 逆順を元の順に戻す
+# if is_reverse:
+#     x_train, x_test = x_train[:, ::-1], x_test[:, ::-1]
+
+# 保存ファイルのファイル名生成
+modelname = model.__class__.__name__
+timestamp = datetime.now().strftime("_%y%m%d_%H%M")
+save_dir = result_dir / (dataset_name + timestamp)
+os.makedirs(save_dir, exist_ok=True)
 
 # Save result as csv
-modelname = model.__class__.__name__
-timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
-result_train_csv = result_dir / ("result_" + dataset_name + "_" + modelname + "_" + timestamp + "_train.csv")
-result_test_csv = result_dir / ("result_" + dataset_name + "_" + modelname + "_" + timestamp + "_test.csv")
-if is_reverse:
-    x_train, x_test = x_train[:, ::-1], x_test[:, ::-1]  # 逆順を元の順に戻す
+result_train_csv = save_dir /  ("result_" + dataset_name + "_" + modelname + "_train.csv")
+result_test_csv = save_dir / ("result_" + dataset_name + "_" + modelname + "_test.csv")
+
 seq.result_to_csv(result_train_csv, x_train, t_train, guess_train, encoding=encoding)
 seq.result_to_csv(result_test_csv, x_test, t_test, guess_test, encoding=encoding)
 
 # Plot learning curve and save it as png image
-image_path = result_dir / ('result_' + dataset_name + "_" + modelname + "_" + timestamp + '.png')
-trainer.plot(image_path)
+image_path = save_dir / ('result_' + dataset_name + "_" + modelname + '.png')
+trainer.plot(image_path=image_path)
 
 # Save parameters
 pickle_path = model_dir / (dataset_name + "_" + modelname + '_epoch' + max_epoch + "_" + timestamp + '.pkl')

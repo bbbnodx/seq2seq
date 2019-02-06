@@ -292,6 +292,34 @@ class TimeAffine:
 
         return dx
 
+class TimeSoftmax:
+    def __init__(self):
+        self.params, self.grads = [], []
+        self.cache = None
+
+    def forward(self, xs):
+        N, T, V = xs.shape
+
+        # バッチ分と時系列分をまとめる（reshape）
+        xs = xs.reshape(N * T, V)
+        ys = softmax(xs)
+
+        out = ys.reshape(N, T, V)
+        self.cache = out
+        return out
+
+    def backward(self, dout):
+        N, T, V = dout.shape
+        out = self.cache
+
+        dx = dout * out
+        dx = dx.reshape(N * T, V)
+        sumdx = dx.sum(axis=1, keepdims=True)
+        dx -= out * sumdx
+        dx = dx.reshape((N, T, V))
+
+        return dx
+
 
 class TimeSoftmaxWithLoss:
     def __init__(self):

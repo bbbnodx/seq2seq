@@ -49,6 +49,12 @@ class TextSequence:
     def vocab(self):
         return self.char_to_id, self.id_to_char
 
+    @vocab.setter
+    def vocab(self, vocab):
+        char_to_id, id_to_char = vocab
+        self.char_to_id = char_to_id
+        self.id_to_char = id_to_char
+
     @property
     def raw_x(self):
         '''
@@ -84,7 +90,7 @@ class TextSequence:
                 self.id_to_char[i] = char
 
 
-    def read_csv(self, source_csv, col_x='x', col_t='y'):
+    def read_csv(self, source_csv, col_x='x', col_t='y', vocab_init=True):
         '''
         CSVを読み込み、文字列を文字IDベクトルに変換してデータセットとして保持する
         CSV format:
@@ -99,6 +105,8 @@ class TextSequence:
             入力文字列のカラム名
         col_t : str, optional
             教師文字列のカラム名
+        vocab_init : bool
+            ボキャブラリーdictを初期化する判定
 
         Returns
         -------
@@ -114,7 +122,8 @@ class TextSequence:
 
         # create vocab dict
         # ついでに文字IDベクトルの次元数(=文字列の最大長さ)を取得する
-        self._init_vocab()
+        if vocab_init:
+            self._init_vocab()
         dim_x = dim_t = 0
         for x, t in zip(raw_x, raw_t):
             self._update_vocab(x)
@@ -242,7 +251,7 @@ class TextSequence:
             yield x_train, x_test, t_train, t_test
 
 
-    def result_to_csv(self, target_csv, vec_x, vec_t, vec_guess, encoding='utf-8'):
+    def result_to_csv(self, target_csv, vec_x, vec_t, vec_guess, cf=None, encoding='utf-8'):
         '''
         推論結果から文字列へ変換し、正解判定もつけてCSVへ保存する
 
@@ -256,6 +265,8 @@ class TextSequence:
             教師データの文字IDベクトル表現
         vec_guess : np.ndarray
             推論結果の文字IDベクトル表現
+        cf : np.ndarray (N, )
+            確信度
         encoding : str, optional
             文字コード
             データセットCSVと同じ文字コードにする
@@ -275,8 +286,10 @@ class TextSequence:
 
         accuracy = sum(correct) / len(correct)
         print("Accuracy:", accuracy)
-
-        df = pd.DataFrame({'x': xs, 'y': ts, 'guess': gs, 'correct': correct})
+        if cf is None:
+            df = pd.DataFrame({'x': xs, 'y': ts, 'guess': gs, 'correct': correct})
+        else:
+            df = pd.DataFrame({'x': xs, 'y': ts, 'guess': gs, 'correct': correct, 'cf': cf})
         df.to_csv(target_csv, index=False, encoding=encoding)
 
         return df
