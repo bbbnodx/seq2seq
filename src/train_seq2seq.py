@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
-from dataset.sequence import TextSequence
+from data.sequence import TextSequence
 from common.optimizer import Adam
 from common.trainer import Trainer
 from common.util import eval_seq2seq
@@ -15,7 +15,7 @@ from peeky_seq2seq import PeekySeq2seq
 from attention_seq2seq import AttentionSeq2seq
 
 # ファイルパスの設定
-dataset_dir =Path('./dataset')
+dataset_dir =Path('../dataset')
 # source_csv = dataset_dir / "addition.csv"
 source_csv = dataset_dir / "interpretation_train43_and_test40.csv"
 result_dir = Path('../result')
