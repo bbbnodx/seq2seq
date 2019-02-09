@@ -1,6 +1,6 @@
 # My project data directory
-result/
-dataset/
+*.csv
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
