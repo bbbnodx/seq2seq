@@ -90,7 +90,7 @@ class TextSequence:
                 self.id_to_char[i] = char
 
 
-    def read_csv(self, source_csv, col_x='x', col_t='y', vocab_init=True):
+    def read_csv(self, source_csv, col_x='x', col_t='y', vocab_init=False):
         '''
         CSVを読み込み、文字列を文字IDベクトルに変換してデータセットとして保持する
         CSV format:

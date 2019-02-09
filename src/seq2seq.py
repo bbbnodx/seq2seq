@@ -237,11 +237,12 @@ class Seq2seq(BaseModel):
         self.grads = self.encoder.grads + self.decoder.grads
 
     def forward(self, xs, ts):
+        encoder_xs = xs[:, ::-1]
         # Decoderの入力データ:教師データの最終文字を除いたもの
         # 損失関数の教師データ:教師データの2文字目以降
         decoder_xs, decoder_ts = ts[:, :-1], ts[:, 1:]
 
-        h = self.encoder.forward(xs)
+        h = self.encoder.forward(encoder_xs)
         score = self.decoder.forward(decoder_xs, h)
         loss = self.loss.forward(score, decoder_ts)
 
@@ -273,7 +274,8 @@ class Seq2seq(BaseModel):
             推論結果の文字IDベクトルのミニバッチ
         '''
 
-        h = self.encoder.forward(xs)
+        encoder_xs = xs[:, ::-1]
+        h = self.encoder.forward(encoder_xs)
         sampled = self.decoder.generate(h, start_id, sample_size)
 
         return sampled
@@ -299,7 +301,8 @@ class Seq2seq(BaseModel):
             シーケンスごとの確信度
         '''
 
-        h = self.encoder.forward(xs)
+        encoder_xs = xs[:, ::-1]
+        h = self.encoder.forward(encoder_xs)
         sampled, cf = self.decoder.generate_with_cf(h, start_id, sample_size)
 
         return sampled, cf
