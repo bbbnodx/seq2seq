@@ -1,10 +1,29 @@
 from common.time_layers import *
-from seq2seq import Encoder, Seq2seq
+from seq2seq import Encoder, BiEncoder, Seq2seq
 from attention_layer import TimeAttention
 
 class AttentionEncoder(Encoder):
     '''
     Encoderからの変更点は出力が最後の隠れ状態hから
+    全系列の隠れ状態hsになったことのみ
+    '''
+
+    def forward(self, xs):
+        xs = self.embed.forward(xs)
+        hs = self.lstm.forward(xs)
+
+        return hs
+
+    def backward(self, dhs):
+        dout = self.lstm.backward(dhs)
+        dout = self.embed.backward(dout)
+
+        return dout
+
+
+class AttentionBiEncoder(BiEncoder):
+    '''
+    BiEncoderからの変更点は出力が最後の隠れ状態hから
     全系列の隠れ状態hsになったことのみ
     '''
 
@@ -95,7 +114,8 @@ class AttentionDecoder:
         char_id = np.array(start_id).reshape(1, 1).repeat(N, axis=0)
 
         ### 確信度の取得用 ###
-        sum_cf = 0
+        sum_cf = np.zeros(N)
+        counts = np.zeros(N, dtype=np.int)
         softmax = TimeSoftmax()
         ##########
 
@@ -113,14 +133,21 @@ class AttentionDecoder:
             char_id = score.argmax(axis=2)
             sampled.append(char_id.flatten())
             ### 確信度の加算 ###
-            sum_cf += score.max(axis=2).flatten()
+            mask = (char_id.flatten() != 0)
+            sum_cf[mask] += score.max(axis=2).flatten()[mask]
+            counts += mask
             ##########
 
-        cf = sum_cf / sample_size  # mean
+        cf = sum_cf / counts  # mean
 
         return np.array(sampled).T, cf
 
 class AttentionSeq2seq(Seq2seq):
+    '''
+    Attention付きのseq2seq
+    Encoderから全時系列の隠れ状態hsを出力させ、
+    DecoderのLTSMレイヤとAffineレイヤとの間にAttentionレイヤを追加
+    '''
     def __init__(self, vocab_size, wordvec_size, hidden_size):
         args = vocab_size, wordvec_size, hidden_size
         self.encoder = AttentionEncoder(*args)
@@ -130,6 +157,18 @@ class AttentionSeq2seq(Seq2seq):
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads
 
+class AttentionSeq2seqBiLSTM(Seq2seq):
+    '''
+    Encoderに双方向LSTMを採用したAttention付きseq2seq
+    '''
+    def __init__(self, vocab_size, wordvec_size, hidden_size):
+        args = vocab_size, wordvec_size, hidden_size
+        self.encoder = AttentionBiEncoder(*args)
+        self.decoder = AttentionDecoder(*args)
+        self.loss = TimeSoftmaxWithLoss()
+
+        self.params = self.encoder.params + self.decoder.params
+        self.grads = self.encoder.grads + self.decoder.grads
 
 def _init_parameter_attention(V, D, H):
     '''

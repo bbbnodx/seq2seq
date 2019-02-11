@@ -51,6 +51,12 @@ class TextSequence:
 
     @vocab.setter
     def vocab(self, vocab):
+        '''
+        Parameters
+        ----------
+        vocab : tuple(dict, dict)
+            char_to_id, id_to_char
+        '''
         char_to_id, id_to_char = vocab
         self.char_to_id = char_to_id
         self.id_to_char = id_to_char

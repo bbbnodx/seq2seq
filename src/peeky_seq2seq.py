@@ -2,7 +2,7 @@
 from common.time_layers import *
 from common.base_model import BaseModel
 from functools import partial
-from seq2seq import Encoder, Seq2seq, _init_parameter
+from seq2seq import Encoder, BiEncoder, Seq2seq, _init_parameter
 
 class PeekyDecoder:
     '''
@@ -210,6 +210,19 @@ class PeekySeq2seq(Seq2seq):
     def __init__(self, vocab_size, wordvec_size, hidden_size):
         V, D, H = vocab_size, wordvec_size, hidden_size
         self.encoder = Encoder(V, D, H)
+        self.decoder = PeekyDecoder(V, D, H)
+        self.loss = TimeSoftmaxWithLoss()
+
+        self.params = self.encoder.params + self.decoder.params
+        self.grads = self.encoder.grads + self.decoder.grads
+
+class PeekySeq2seqBiLSTM(Seq2seq):
+    '''
+    Encoderに双方向LSTMを採用したPeekySeq2seq
+    '''
+    def __init__(self, vocab_size, wordvec_size, hidden_size):
+        V, D, H = vocab_size, wordvec_size, hidden_size
+        self.encoder = BiEncoder(V, D, H)
         self.decoder = PeekyDecoder(V, D, H)
         self.loss = TimeSoftmaxWithLoss()
 

@@ -1,6 +1,4 @@
 # coding: utf-8
-import sys
-sys.path.append('..')
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -49,7 +47,7 @@ optimizer = Adam()
 trainer = Trainer(model, optimizer)
 
 # Train
-trainer.fit(x_train[:, ::-1], t_train, x_test[:, ::-1], t_test,
+trainer.fit(x_train, t_train, x_test, t_test,
             max_epoch=max_epoch,
             batch_size=batch_size,
             max_grad=max_grad)
@@ -57,8 +55,8 @@ trainer.fit(x_train[:, ::-1], t_train, x_test[:, ::-1], t_test,
 # Inference
 start_id = seq.start_id
 sample_size = seq.t_length
-guess_train = model.generate(x_train[:, ::-1], start_id, sample_size)
-guess_test = model.generate(x_test[:, ::-1], start_id, sample_size)
+guess_train = model.generate(x_train, start_id, sample_size)
+guess_test = model.generate(x_test, start_id, sample_size)
 
 
 

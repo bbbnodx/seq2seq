@@ -1,5 +1,7 @@
 # My project data directory
-*.csv
+# *.csv
+!addition*.csv
+!date*.csv
 .vscode/
 
 # Byte-compiled / optimized / DLL files
