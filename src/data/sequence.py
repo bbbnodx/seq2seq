@@ -12,30 +12,35 @@ class TextSequence:
     1行のテキストを文字単位に分割し、文字IDのベクトルに変換する
     また、CSVの入出力メソッドを持つ
     '''
-    def __init__(self, t_prefix='_'):
+    def __init__(self, EOS='_'):
         '''
         Parameters
         ----------
-        t_prefix : str
-            教師データの開始文字
+        EOS : str
+            文章の終わりを示す特殊文字
+            教師データの開始文字もこの文字にして、
             推論のときは、この文字から推論を始め、
             出力された文字を次の推論に用い……を繰り返す
         '''
+        if not isinstance(EOS, str) or len(EOS) != 1:
+            print("Argument 'EOS' is unexpected, so using '_' as 'EOS'.")
+            EOS = '_'
+        self.__EOS = EOS
         self._init_vocab()
         self.vec_x = None
         self.vec_t = None
-        if not isinstance(t_prefix, str) or len(t_prefix) != 1:
-            print("Argument 't_prefix' is unexpected, so using '_' as 't_prefix'.")
-            t_prefix = '_'
-        self.__t_prefix = t_prefix
+
+    def _init_vocab(self):
+        self.char_to_id = {self.__EOS: 0}
+        self.id_to_char = {0: self.__EOS}
 
     @property
-    def t_prefix(self):
-        return self.__t_prefix
+    def EOS(self):
+        return self.__EOS
 
     @property
     def start_id(self):
-        return self.char_to_id[self.__t_prefix]
+        return self.char_to_id[self.__EOS]
 
     @property
     def x_length(self):
@@ -74,11 +79,6 @@ class TextSequence:
         文字列はデータとして持たず、ベクトル表現から変換して返す
         '''
         return self.vector_to_sequence(self.vec_t)
-
-    def _init_vocab(self):
-        self.char_to_id = {}
-        self.id_to_char = {}
-        self._update_vocab(' ')  # 空白をid=0で登録
 
     def _update_vocab(self, text):
         '''
@@ -121,10 +121,10 @@ class TextSequence:
             メンバとしても持つ
         '''
         # read CSV, split inputs and teachers
-        # 教師データの文字列には先頭に開始文字t_prefixを付ける
+        # 教師データの文字列には先頭にEOSを付ける
         df = pd.read_csv(source_csv)
         raw_x = [str(x) for x in df[col_x].values]
-        raw_t = [self.t_prefix + str(t) for t in df[col_t].values]
+        raw_t = [str(t) for t in df[col_t].values]
 
         # create vocab dict
         # ついでに文字IDベクトルの次元数(=文字列の最大長さ)を取得する
@@ -142,13 +142,15 @@ class TextSequence:
         vec_x = np.zeros((nb_data, dim_x), dtype=np.int)
         vec_t = np.zeros((nb_data, dim_t), dtype=np.int)
         for i, (x, t) in enumerate(zip(raw_x, raw_t)):
-            vec_x[i] = [self.char_to_id[char] for char in x.ljust(dim_x, ' ')]
-            vec_t[i] = [self.char_to_id[char] for char in t.ljust(dim_t, ' ')]
+            vec_x[i] = [self.char_to_id[char] for char in x.ljust(dim_x, self.__EOS)]
+            vec_t[i] = [self.char_to_id[char] for char in t.ljust(dim_t, self.__EOS)]
 
+        # 教師データの先頭にEOSを付加する
+        t_prefix = np.array([self.char_to_id[self.__EOS]], dtype=np.int).repeat(nb_data).reshape(nb_data, -1)
         self.vec_x = vec_x
-        self.vec_t = vec_t
+        self.vec_t = np.c_[t_prefix, vec_t]
 
-        return vec_x, vec_t
+        return self.vec_x, self.vec_t
 
     def to_csv(self, target_csv, x=None, t=None, col_x='x', col_t='y'):
         '''
@@ -313,7 +315,7 @@ class TextSequence:
         '''
         if not isinstance(xs, np.ndarray) or xs.ndim != 2:
             raise ValueError('Argument "xs" is not word vector.')
-        # 空白と開始文字('_')を除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
+        # EOS('_')を除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
         return [''.join([self.id_to_char[x]\
-                         for x in row if not self.id_to_char[x] in (' '+self.__t_prefix)])\
+                         for x in row if not self.id_to_char[x] in (self.__EOS)])\
                 for row in xs]
