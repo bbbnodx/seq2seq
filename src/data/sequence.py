@@ -1,10 +1,8 @@
 # coding: utf-8
-import sys
-sys.path.append('..')
-import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from itertools import chain
 
 class TextSequence:
     '''
@@ -12,43 +10,69 @@ class TextSequence:
     1行のテキストを文字単位に分割し、文字IDのベクトルに変換する
     また、CSVの入出力メソッドを持つ
     '''
-    def __init__(self, EOS='_'):
+    def __init__(self, SOS='<SOS>', EOS='<EOS>', PAD='<PAD>', UNK='<UNK>'):
         '''
         Parameters
         ----------
-        EOS : str
+        SOS : str, optional
+            教師データの文章の開始を示す特殊文字
+        EOS : str, optional
             文章の終わりを示す特殊文字
-            教師データの開始文字もこの文字にして、
-            推論のときは、この文字から推論を始め、
-            出力された文字を次の推論に用い……を繰り返す
+            教師データのみに用いられる
+        PAD : str, optional
+            文章の長さを均一にするために挿入される特殊文字
+        UNK : str, optional
+            辞書に存在しないトークンが用いられたとき、代わりに挿入される特殊文字
         '''
-        if not isinstance(EOS, str) or len(EOS) != 1:
-            print("Argument 'EOS' is unexpected, so using '_' as 'EOS'.")
-            EOS = '_'
+
+        self.__SOS = SOS
         self.__EOS = EOS
+        self.__PAD = PAD
+        self.__UNK = UNK
         self._init_vocab()
         self.vec_x = None
         self.vec_t = None
 
     def _init_vocab(self):
-        self.char_to_id = {self.__EOS: 0}
-        self.id_to_char = {0: self.__EOS}
+        self.char_to_id = {self.__PAD: 0,
+                           self.__SOS: 1,
+                           self.__EOS: 2,
+                           self.__UNK: 3}
+        self.id_to_char = {0: self.__PAD,
+                           1: self.__SOS,
+                           2: self.__EOS,
+                           3: self.__UNK}
+
+    @property
+    def SOS(self):
+        return self.__SOS
 
     @property
     def EOS(self):
         return self.__EOS
 
     @property
+    def PAD(self):
+        return self.__PAD
+
+    def PAD_id(self):
+        return self.char_to_id[self.__PAD]
+
+    @property
+    def UNK(self):
+        return self.__UNK
+
+    @property
     def start_id(self):
-        return self.char_to_id[self.__EOS]
+        return self.char_to_id[self.__SOS]
 
     @property
-    def x_length(self):
-        return self.vec_x.shape[1]
+    def padding_id(self):
+        return self.char_to_id[self.__PAD]
 
     @property
-    def t_length(self):
-        return self.vec_t.shape[1] - 1
+    def sample_size(self):
+        return self.vec_t.shape[1] - 1  # exclude SOS
 
     @property
     def vocab(self):
@@ -71,14 +95,14 @@ class TextSequence:
         '''
         文字列はデータとして持たず、ベクトル表現から変換して返す
         '''
-        return self.vector_to_sequence(self.vec_x)
+        return self.vec2seq(self.vec_x)
 
     @property
     def raw_t(self):
         '''
         文字列はデータとして持たず、ベクトル表現から変換して返す
         '''
-        return self.vector_to_sequence(self.vec_t)
+        return self.vec2seq(self.vec_t)
 
     def _update_vocab(self, text):
         '''
@@ -94,7 +118,6 @@ class TextSequence:
                 i = len(self.char_to_id)
                 self.char_to_id[char] = i
                 self.id_to_char[i] = char
-
 
     def read_csv(self, source_csv, col_x='x', col_t='y', vocab_init=False):
         '''
@@ -140,15 +163,15 @@ class TextSequence:
         # convert from string to vector
         nb_data = len(df)
         vec_x = np.zeros((nb_data, dim_x), dtype=np.int)
-        vec_t = np.zeros((nb_data, dim_t), dtype=np.int)
-        for i, (x, t) in enumerate(zip(raw_x, raw_t)):
-            vec_x[i] = [self.char_to_id[char] for char in x.ljust(dim_x, self.__EOS)]
-            vec_t[i] = [self.char_to_id[char] for char in t.ljust(dim_t, self.__EOS)]
+        vec_t = np.zeros((nb_data, dim_t+2), dtype=np.int)  # +2 for SOS and EOS
 
-        # 教師データの先頭にEOSを付加する
-        t_prefix = np.array([self.char_to_id[self.__EOS]], dtype=np.int).repeat(nb_data).reshape(nb_data, -1)
+        sos, eos, pad = [self.__SOS], [self.__EOS], [self.__PAD]
+        for i, (x, t) in enumerate(zip(raw_x, raw_t)):
+            vec_x[i] = [self.char_to_id.get(char, self.__UNK) for char in chain(x, pad * (dim_x - len(x)))]
+            vec_t[i] = [self.char_to_id.get(char, self.__UNK) for char in chain(sos, t, eos, pad * (dim_t - len(t)))]
+
         self.vec_x = vec_x
-        self.vec_t = np.c_[t_prefix, vec_t]
+        self.vec_t = vec_t
 
         return self.vec_x, self.vec_t
 
@@ -224,11 +247,11 @@ class TextSequence:
 
         return train_test_split(x, t, test_size=test_size, random_state=seed, shuffle=shuffle)
 
-    def cv_dataset_gen(self, x=None, t=None, test_size=0.2):
+    def cv_dataset_gen(self, x=None, t=None, K=5):
         '''
-        交差検証用のデータセットを返すジェネレータ
-        test_sizeに応じてデータセットを分割し、
-        テストデータの位置を変えながら訓練データとテストデータを返す
+        K-分割交差検証用のデータセットを返すジェネレータ
+        データセットをK個に分割し、テストデータの位置を変えながら
+        訓練データとテストデータを返す
 
         Parameters
         ----------
@@ -236,8 +259,8 @@ class TextSequence:
             入力データ
         t : np.ndarray, optional
             教師データ
-        test_size : float, optional
-            テストデータのサイズ
+        K : int, optional
+            データセットの分割数
 
         Yields
         ----------
@@ -249,13 +272,13 @@ class TextSequence:
         if not isinstance(t, np.ndarray) or t.ndim != 2:
             t = self.vec_t
 
-        unit = int(x.shape[0] * test_size)
+        unit = x.shape[0] // K
         # kの値に応じてテストデータの位置を変える
-        for k in range(int(1 / test_size)):
-            x_train = np.r_[x[:unit*k], x[unit*(k+1):]]
-            t_train = np.r_[t[:unit*k], t[unit*(k+1):]]
-            x_test = x[unit*k:unit*(k+1)]
-            t_test = t[unit*k:unit*(k+1)]
+        for i in range(K):
+            x_train = np.r_[x[:unit*i], x[unit*(i+1):]]
+            t_train = np.r_[t[:unit*i], t[unit*(i+1):]]
+            x_test = x[unit*i:unit*(i+1)]
+            t_test = t[unit*i:unit*(i+1)]
             yield x_train, x_test, t_train, t_test
 
 
@@ -286,9 +309,9 @@ class TextSequence:
         '''
 
         # 文字列へ変換
-        xs = self.vector_to_sequence(vec_x)
-        ts = self.vector_to_sequence(vec_t)
-        gs = self.vector_to_sequence(vec_guess)
+        xs = self.vec2seq(vec_x)
+        ts = self.vec2seq(vec_t)
+        gs = self.vec2seq(vec_guess)
         # 正解判定
         correct = [1 if t == guess else 0 for t, guess in zip(ts, gs)]
 
@@ -302,7 +325,7 @@ class TextSequence:
 
         return df
 
-    def vector_to_sequence(self, xs):
+    def vec2seq(self, xs):
         '''
         Parameters
         ----------
@@ -315,7 +338,67 @@ class TextSequence:
         '''
         if not isinstance(xs, np.ndarray) or xs.ndim != 2:
             raise ValueError('Argument "xs" is not word vector.')
-        # EOS('_')を除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
+        # <EOS>と<PAD>を除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
         return [''.join([self.id_to_char[x]\
-                         for x in row if not self.id_to_char[x] in (self.__EOS)])\
+                         for x in row if not self.id_to_char[x] in (self.__SOS, self.__EOS, self.__PAD)])\
                 for row in xs]
+
+
+    def seq2vec(self, x, size, vocab_update=False):
+        '''
+        テキストを文字IDベクトルへ変換する
+        主に推論時に用いる
+
+        Parameters
+        ----------
+        x : str
+            翻訳元の入力テキスト
+        size : int
+            ベクトルの最大長
+            不足分はPADでパディングされる
+        vocab_update : bool, optional
+            ボキャブラリーを更新するかどうか
+
+        Returns
+        -------
+        np.ndarray (size, )
+            文字IDベクトル
+            ボキャブラリーに無い文字はUNKが充てられる
+        '''
+
+        if not isinstance(x, str):
+            raise ValueError('Argument "x" is not string.')
+
+        if vocab_update:
+            self._update_vocab(x)
+
+        pad = [self.__PAD]
+        return np.array([self.char_to_id.get(char, self.__UNK) for char in chain(x[:size], pad * (size - len(x)))])
+
+
+    def seqlist2vec(self, xs, size, vocab_update=False):
+        '''
+        テキストのリストを文字IDベクトルのミニバッチに変換するヘルパー関数
+
+        Parameters
+        ----------
+        xs : list
+            テキストのリスト
+        size : int
+            ベクトルの最大長
+        vocab_update : bool, optional
+            ボキャブラリ辞書を更新するかどうか (the default is False, which [default_description])
+
+        Returns
+        -------
+        np.ndarray (len(xs), size)
+            文字IDベクトルのミニバッチ
+        '''
+
+        if not isinstance(xs, list):
+            raise ValueError('Argument "xs" is not list.')
+        batch = []
+        for x in xs:
+            batch.append(self.seq2vec(x, size, vocab_update=vocab_update))
+
+        return np.array(batch)

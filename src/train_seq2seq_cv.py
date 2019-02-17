@@ -37,11 +37,14 @@ x, t = seq.shuffle(seed=1)
 # K-分割交差法(test_size = 1/K)
 K = 4
 
-for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, test_size=1/K)):
+for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, K=K)):
     # モデル選択(パラメータの初期化)
-    # model = Seq2seq(vocab_size, wordvec_size, hidden_size)
-    model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size)
-    # model = AttentionSeq2seq(vocab_size, wordvec_size, hidden_size)
+    # model = Seq2seq(vocab_size, wordvec_size,
+    #                 hidden_size, ignore_index=seq.PAD_id)
+    model = PeekySeq2seq(vocab_size, wordvec_size,
+                         hidden_size, ignore_index=seq.PAD_id)
+    # model = AttentionSeq2seq(vocab_size, wordvec_size,
+    #                          hidden_size, ignore_index=seq.PAD_id)
     optimizer = Adam()
     trainer = Trainer(model, optimizer)
     print("Cross Validation: iter", str(i+1))
@@ -53,7 +56,7 @@ for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, 
 
     # Inference
     start_id = seq.start_id
-    sample_size = seq.t_length
+    sample_size = seq.sample_size
     guess_train = model.generate(x_train, start_id, sample_size)
     guess_test = model.generate(x_test, start_id, sample_size)
 

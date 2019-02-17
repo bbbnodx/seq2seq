@@ -322,10 +322,21 @@ class TimeSoftmax:
 
 
 class TimeSoftmaxWithLoss:
-    def __init__(self):
+    def __init__(self, ignore_index=-1):
+        '''
+        ignore_indexに指定した文字IDを損失関数の計算から除外する
+
+        Parameters
+        ----------
+        ignore_index : int, optional
+            損失関数の計算から除外する文字ID
+            (the default is -1, which give no thought to mask)
+
+        '''
+
         self.params, self.grads = [], []
         self.cache = None
-        self.ignore_label = -1
+        self.ignore_index = ignore_index
 
     def forward(self, xs, ts):
         N, T, V = xs.shape
@@ -333,7 +344,7 @@ class TimeSoftmaxWithLoss:
         if ts.ndim == 3:  # 教師ラベルがone-hotベクトルの場合
             ts = ts.argmax(axis=2)
 
-        mask = (ts != self.ignore_label)
+        mask = (ts != self.ignore_index)
 
         # バッチ分と時系列分をまとめる（reshape）
         xs = xs.reshape(N * T, V)
@@ -342,7 +353,7 @@ class TimeSoftmaxWithLoss:
 
         ys = softmax(xs)
         ls = np.log(ys[np.arange(N * T), ts])
-        ls *= mask  # ignore_labelに該当するデータは損失を0にする
+        ls *= mask  # ignore_indexに該当するデータは損失を0にする
         loss = -np.sum(ls)
         loss /= mask.sum()
 
@@ -356,7 +367,7 @@ class TimeSoftmaxWithLoss:
         dx[np.arange(N * T), ts] -= 1
         dx *= dout
         dx /= mask.sum()
-        dx *= mask[:, np.newaxis]  # ignore_labelに該当するデータは勾配を0にする
+        dx *= mask[:, np.newaxis]  # ignore_indexに該当するデータは勾配を0にする
 
         dx = dx.reshape((N, T, V))
 

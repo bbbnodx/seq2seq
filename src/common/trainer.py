@@ -28,6 +28,8 @@ class Trainer:
         loss_count = 0
 
         start_time = time.time()
+        print("Start training:\nmodel = {}\noptimizer = {}\nbatch size = {}\ntrain epochs = {}".format(
+            self.model.__class__.__name__, self.optimizer.__class__.__name__, batch_size, max_epoch))
         for epoch in range(max_epoch):
             epoch_start_time = time.time()
             # シャッフル

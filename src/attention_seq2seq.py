@@ -148,11 +148,11 @@ class AttentionSeq2seq(Seq2seq):
     Encoderから全時系列の隠れ状態hsを出力させ、
     DecoderのLTSMレイヤとAffineレイヤとの間にAttentionレイヤを追加
     '''
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
         args = vocab_size, wordvec_size, hidden_size
         self.encoder = AttentionEncoder(*args)
         self.decoder = AttentionDecoder(*args)
-        self.loss = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads
@@ -161,11 +161,11 @@ class AttentionSeq2seqBiLSTM(Seq2seq):
     '''
     Encoderに双方向LSTMを採用したAttention付きseq2seq
     '''
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
         args = vocab_size, wordvec_size, hidden_size
         self.encoder = AttentionBiEncoder(*args)
         self.decoder = AttentionDecoder(*args)
-        self.loss = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads
