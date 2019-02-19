@@ -119,7 +119,7 @@ class TextSequence:
                 self.char_to_id[char] = i
                 self.id_to_char[i] = char
 
-    def read_csv(self, source_csv, col_x='x', col_t='y', vocab_init=False):
+    def read_csv(self, source_csv, col_x='x', col_t='y', vocab_init=False, vocab_update=True):
         '''
         CSVを読み込み、文字列を文字IDベクトルに変換してデータセットとして保持する
         CSV format:
@@ -135,7 +135,9 @@ class TextSequence:
         col_t : str, optional
             教師文字列のカラム名
         vocab_init : bool
-            ボキャブラリーdictを初期化する判定
+            ボキャブラリー辞書を初期化する判定
+        vocab_update : bool
+            ボキャブラリー辞書を更新する判定
 
         Returns
         -------
@@ -155,8 +157,9 @@ class TextSequence:
             self._init_vocab()
         dim_x = dim_t = 0
         for x, t in zip(raw_x, raw_t):
-            self._update_vocab(x)
-            self._update_vocab(t)
+            if vocab_update:
+                self._update_vocab(x)
+                self._update_vocab(t)
             dim_x = len(x) if len(x) > dim_x else dim_x
             dim_t = len(t) if len(t) > dim_t else dim_t
 
@@ -166,9 +169,10 @@ class TextSequence:
         vec_t = np.zeros((nb_data, dim_t+2), dtype=np.int)  # +2 for SOS and EOS
 
         sos, eos, pad = [self.__SOS], [self.__EOS], [self.__PAD]
+        unk = self.char_to_id[self.__UNK]
         for i, (x, t) in enumerate(zip(raw_x, raw_t)):
-            vec_x[i] = [self.char_to_id.get(char, self.__UNK) for char in chain(x, pad * (dim_x - len(x)))]
-            vec_t[i] = [self.char_to_id.get(char, self.__UNK) for char in chain(sos, t, eos, pad * (dim_t - len(t)))]
+            vec_x[i] = [self.char_to_id.get(char, unk) for char in chain(x, pad * (dim_x - len(x)))]
+            vec_t[i] = [self.char_to_id.get(char, unk) for char in chain(sos, t, eos, pad * (dim_t - len(t)))]
 
         self.vec_x = vec_x
         self.vec_t = vec_t
@@ -373,7 +377,8 @@ class TextSequence:
             self._update_vocab(x)
 
         pad = [self.__PAD]
-        return np.array([self.char_to_id.get(char, self.__UNK) for char in chain(x[:size], pad * (size - len(x)))])
+        unk = self.char_to_id[self.__UNK]
+        return np.array([self.char_to_id.get(char, unk) for char in chain(x[:size], pad * (size - len(x)))], dtype=np.int)
 
 
     def seqlist2vec(self, xs, size, vocab_update=False):
