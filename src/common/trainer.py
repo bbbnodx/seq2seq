@@ -109,8 +109,8 @@ class Trainer:
         color_loss = 'blue'
         color_err = 'orange'
         epoch_range = range(1, len(self.loss_list)+1)
-        x1 = np.array(epoch_range)
-        x2 = np.array([x for x in epoch_range if x <= 5 or x == len(self.loss_list) or x % self.eval_interval == 0])
+        x1 = numpy.array(epoch_range)
+        x2 = numpy.array([x for x in epoch_range if x <= 5 or x == len(self.loss_list) or x % self.eval_interval == 0])
         ax1.plot(x1, self.loss_list, color=color_loss, label='loss')
         ax2.plot(x2, self.err_train, color=color_err, label='train error')
         ax2.plot(x2, self.err_test, color=color_err, linestyle='dashed', label='test error')
