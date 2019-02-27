@@ -8,6 +8,10 @@
 # Seq2seq
 Sequence to Sequence learning model with LSTM.
 
+- [The resulting directory structure](#-the-resulting-directory-structure)
+- [Installing development requirements](#-installing-development-requirements)
+- [Training](#-training)
+
 
 ### The resulting directory structure
 ---
