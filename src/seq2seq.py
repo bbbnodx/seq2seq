@@ -247,11 +247,11 @@ class Seq2seq(BaseModel):
     改良モデルの基底クラスでもあり、__init__以外のメソッドは共用する
     '''
 
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
         V, D, H = vocab_size, wordvec_size, hidden_size
         self.encoder = Encoder(V, D, H)
         self.decoder = Decoder(V, D, H)
-        self.loss = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads
@@ -360,11 +360,11 @@ class Seq2seqBiLSTM(Seq2seq):
     Encoderに双方向LSTMを採用したSeq2seq
     '''
 
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
         V, D, H = vocab_size, wordvec_size, hidden_size
         self.encoder = BiEncoder(V, D, H)
         self.decoder = Decoder(V, D, H)
-        self.loss = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads

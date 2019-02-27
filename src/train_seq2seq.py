@@ -39,9 +39,9 @@ max_grad = 5.0
 x_train, x_test, t_train, t_test = seq.split_data(seed=1, test_size=0.1)
 
 # モデル選択
-# model = Seq2seq(vocab_size, wordvec_size, hidden_size)
-# model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size)
-model = AttentionSeq2seq(vocab_size, wordvec_size, hidden_size)
+# model = Seq2seq(vocab_size, wordvec_size, hidden_size, ignore_index=seq.PAD_id)
+# model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size, ignore_index=seq.PAD_id)
+model = AttentionSeq2seq(vocab_size, wordvec_size, hidden_size, ignore_index=seq.PAD_id)
 
 optimizer = Adam()
 trainer = Trainer(model, optimizer)
@@ -54,7 +54,7 @@ trainer.fit(x_train, t_train, x_test, t_test,
 
 # Inference
 start_id = seq.start_id
-sample_size = seq.t_length
+sample_size = seq.sample_size
 guess_train = model.generate(x_train, start_id, sample_size)
 guess_test = model.generate(x_test, start_id, sample_size)
 
