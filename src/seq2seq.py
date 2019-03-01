@@ -327,7 +327,7 @@ class Seq2seq(BaseModel):
 
         return sampled, cf
 
-    def validation(self, xs, ts):
+    def validate(self, xs, ts):
         '''
         xsから推論を行い、tsと比較して正解数を返す
 

@@ -423,19 +423,6 @@ class TimeBiLSTM:
         dxs = dxs1 + dxs2
         return dxs
 
-# ====================================================================== #
-# 以下に示すレイヤは、本書で説明をおこなっていないレイヤの実装もしくは
-# 処理速度よりも分かりやすさを優先したレイヤの実装です。
-#
-# TimeSigmoidWithLoss: 時系列データのためのシグモイド損失レイヤ
-# GRU: GRUレイヤ
-# TimeGRU: 時系列データのためのGRUレイヤ
-# BiTimeLSTM: 双方向LSTMレイヤ
-# Simple_TimeSoftmaxWithLoss：単純なTimeSoftmaxWithLossレイヤの実装
-# Simple_TimeAffine: 単純なTimeAffineレイヤの実装
-# ====================================================================== #
-
-
 class TimeSigmoidWithLoss:
     def __init__(self):
         self.params, self.grads = [], []

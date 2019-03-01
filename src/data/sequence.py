@@ -55,6 +55,7 @@ class TextSequence:
     def PAD(self):
         return self.__PAD
 
+    @property
     def PAD_id(self):
         return self.char_to_id[self.__PAD]
 
@@ -67,16 +68,16 @@ class TextSequence:
         return self.char_to_id[self.__SOS]
 
     @property
-    def padding_id(self):
-        return self.char_to_id[self.__PAD]
-
-    @property
     def sample_size(self):
         return self.vec_t.shape[1] - 1  # exclude SOS
 
     @property
     def vocab(self):
         return self.char_to_id, self.id_to_char
+
+    @property
+    def vocab_size(self):
+        return len(self.char_to_id)
 
     @vocab.setter
     def vocab(self, vocab):
@@ -146,7 +147,6 @@ class TextSequence:
             メンバとしても持つ
         '''
         # read CSV, split inputs and teachers
-        # 教師データの文字列には先頭にEOSを付ける
         df = pd.read_csv(source_csv)
         raw_x = [str(x) for x in df[col_x].values]
         raw_t = [str(t) for t in df[col_t].values]
@@ -168,6 +168,9 @@ class TextSequence:
         vec_x = np.zeros((nb_data, dim_x), dtype=np.int)
         vec_t = np.zeros((nb_data, dim_t+2), dtype=np.int)  # +2 for SOS and EOS
 
+        # 文字列長が最大長より短い場合、PADで埋める
+        # ボキャブラリに存在しない文字はUNKで置き換える
+        # 教師データはベクトル表現の前後にSOSとEOSを付ける
         sos, eos, pad = [self.__SOS], [self.__EOS], [self.__PAD]
         unk = self.char_to_id[self.__UNK]
         for i, (x, t) in enumerate(zip(raw_x, raw_t)):
@@ -178,6 +181,30 @@ class TextSequence:
         self.vec_t = vec_t
 
         return self.vec_x, self.vec_t
+
+    def _validate_args(self, x, t):
+        '''
+        引数のx, tが2階のndarrayであるかどうかを検査し、
+        検査に通らなければself.vec_x, self.vec_tを代わりに返す
+
+        Parameters
+        ----------
+        x : np.ndarray
+            input data
+        t : np.ndarray
+            teacher data
+
+        Returns
+        -------
+        np.ndarray, np.ndarray
+            Arguments or member
+        '''
+
+        if not isinstance(x, np.ndarray) or x.ndim != 2:
+            x = self.vec_x
+        if not isinstance(t, np.ndarray) or t.ndim != 2:
+            t = self.vec_t
+        return x, t
 
     def to_csv(self, target_csv, x=None, t=None, col_x='x', col_t='y'):
         '''
@@ -192,10 +219,10 @@ class TextSequence:
             保存するCSVファイルのパス
         x : np.ndarray, optional
             入力データ
-            指定しない場合はself.x_vecを用いる
+            指定しない場合はself.vec_xを用いる
         t : np.ndarray, optional
             教師データ
-            指定しない場合はself.t_vecを用いる
+            指定しない場合はself.vec_tを用いる
         col_x : str, optional
             入力データのカラム名prefix
         col_t : str, optional
@@ -206,10 +233,7 @@ class TextSequence:
         pd.DataFrame
             保存するCSVと同じフォーマットのDataFrame
         '''
-        if not isinstance(x, np.ndarray) or x.ndim != 2:
-            x = self.vec_x
-        if not isinstance(t, np.ndarray) or t.ndim != 2:
-            t = self.vec_t
+        x, t = self._validate_args(x, t)
 
         columns_x = [col_x + '__' + str(i) for i in range(x.shape[1])]
         columns_t = [col_t + '__' + str(i) for i in range(t.shape[1])]
@@ -220,10 +244,27 @@ class TextSequence:
         return df
 
     def shuffle(self, x=None, t=None, seed=None):
-        if not isinstance(x, np.ndarray) or x.ndim != 2:
-            x = self.vec_x
-        if not isinstance(t, np.ndarray) or t.ndim != 2:
-            t = self.vec_t
+        '''
+        データをシャッフルする
+
+        Parameters
+        ----------
+        x : np.ndarray, optional
+            入力データ
+            指定しない場合はself.vec_xを用いる
+        t : np.ndarray, optional
+            教師データ
+            指定しない場合はself.vec_tを用いる
+        seed : int, optional
+            乱数シードの指定
+
+        Returns
+        -------
+        np.ndarray, np.ndarray
+            シャッフルされた入力データ、教師データ
+        '''
+
+        x, t = self._validate_args(x, t)
         nb_data = len(x)
         indices = np.arange(nb_data)
         if seed is not None:
@@ -244,10 +285,7 @@ class TextSequence:
         (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
             x_train, x_test, t_train, t_test
         '''
-        if not isinstance(x, np.ndarray) or x.ndim != 2:
-            x = self.vec_x
-        if not isinstance(t, np.ndarray) or t.ndim != 2:
-            t = self.vec_t
+        x, t = self._validate_args(x, t)
 
         return train_test_split(x, t, test_size=test_size, random_state=seed, shuffle=shuffle)
 
@@ -271,10 +309,7 @@ class TextSequence:
         x_train, x_test, t_train, t_test : np.ndarray * 4
         '''
 
-        if not isinstance(x, np.ndarray) or x.ndim != 2:
-            x = self.vec_x
-        if not isinstance(t, np.ndarray) or t.ndim != 2:
-            t = self.vec_t
+        x, t = self._validate_args(x, t)
 
         unit = x.shape[0] // K
         # kの値に応じてテストデータの位置を変える
@@ -316,7 +351,7 @@ class TextSequence:
         xs = self.vec2seq(vec_x)
         ts = self.vec2seq(vec_t)
         gs = self.vec2seq(vec_guess)
-        # 正解判定
+        # レコードごとの正解判定
         correct = [1 if t == guess else 0 for t, guess in zip(ts, gs)]
 
         accuracy = sum(correct) / len(correct)
@@ -342,7 +377,7 @@ class TextSequence:
         '''
         if not isinstance(xs, np.ndarray) or xs.ndim != 2:
             raise ValueError('Argument "xs" is not word vector.')
-        # <EOS>と<PAD>を除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
+        # SOS, EOS, PADを除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
         return [''.join([self.id_to_char[x]\
                          for x in row if not self.id_to_char[x] in (self.__SOS, self.__EOS, self.__PAD)])\
                 for row in xs]

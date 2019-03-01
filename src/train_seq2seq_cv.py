@@ -5,7 +5,6 @@ from pathlib import Path
 from data.sequence import TextSequence
 from common.optimizer import Adam
 from common.trainer import Trainer
-from common.util import eval_seq2seq
 from seq2seq import Seq2seq
 from peeky_seq2seq import PeekySeq2seq
 from attention_seq2seq import AttentionSeq2seq
@@ -25,7 +24,7 @@ char_to_id, id_to_char = seq.vocab
 
 # ハイパーパラメータ
 vocab_size = len(char_to_id)
-wordvec_size = 64
+wordvec_size = 128
 hidden_size = 128
 batch_size = 32
 max_epoch = 50
@@ -39,12 +38,9 @@ K = 4
 
 for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, K=K)):
     # モデル選択(パラメータの初期化)
-    # model = Seq2seq(vocab_size, wordvec_size,
-    #                 hidden_size, ignore_index=seq.PAD_id)
-    model = PeekySeq2seq(vocab_size, wordvec_size,
-                         hidden_size, ignore_index=seq.PAD_id)
-    # model = AttentionSeq2seq(vocab_size, wordvec_size,
-    #                          hidden_size, ignore_index=seq.PAD_id)
+    # model = Seq2seq(vocab_size, wordvec_size, hidden_size)
+    model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size)
+    # model = AttentionSeq2seq(vocab_size, wordvec_size, hidden_size)
     optimizer = Adam()
     trainer = Trainer(model, optimizer)
     print("Cross Validation: iter", str(i+1))
