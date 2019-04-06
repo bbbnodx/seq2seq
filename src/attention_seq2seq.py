@@ -104,7 +104,7 @@ class AttentionDecoder:
             char_id = score.argmax(axis=2)
             sampled.append(char_id.flatten())
 
-        return np.array(sampled).T
+        return np.array(sampled, dtype=np.int).T
 
     def generate_with_cf(self, hs_enc, start_id, sample_size):
         N= hs_enc.shape[0]
@@ -140,7 +140,7 @@ class AttentionDecoder:
 
         cf = sum_cf / counts  # mean
 
-        return np.array(sampled).T, cf
+        return np.array(sampled, dtype=np.int).T, cf
 
 class AttentionSeq2seq(Seq2seq):
     '''

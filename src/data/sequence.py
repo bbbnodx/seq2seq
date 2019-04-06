@@ -1,5 +1,6 @@
 # coding: utf-8
-import numpy as np
+from common.np import *
+import numpy
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from itertools import chain
@@ -174,8 +175,8 @@ class TextSequence:
         sos, eos, pad = [self.__SOS], [self.__EOS], [self.__PAD]
         unk = self.char_to_id[self.__UNK]
         for i, (x, t) in enumerate(zip(raw_x, raw_t)):
-            vec_x[i] = [self.char_to_id.get(char, unk) for char in chain(x, pad * (dim_x - len(x)))]
-            vec_t[i] = [self.char_to_id.get(char, unk) for char in chain(sos, t, eos, pad * (dim_t - len(t)))]
+            vec_x[i] = np.array([self.char_to_id.get(char, unk) for char in chain(x, pad * (dim_x - len(x)))])
+            vec_t[i] = np.array([self.char_to_id.get(char, unk) for char in chain(sos, t, eos, pad * (dim_t - len(t)))])
 
         self.vec_x = vec_x
         self.vec_t = vec_t
@@ -377,6 +378,8 @@ class TextSequence:
         '''
         if not isinstance(xs, np.ndarray) or xs.ndim != 2:
             raise ValueError('Argument "xs" is not word vector.')
+        if GPU:
+            xs = np.asnumpy(xs)
         # SOS, EOS, PADを除いてベクトル表現を文字に変換し、行ごとに連結して文字列のリストを返す
         return [''.join([self.id_to_char[x]\
                          for x in row if not self.id_to_char[x] in (self.__SOS, self.__EOS, self.__PAD)])\

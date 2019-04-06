@@ -129,7 +129,7 @@ class PeekyDecoder:
             char_id = score.argmax(axis=2)
             sampled.append(char_id.flatten())
 
-        return np.array(sampled).T
+        return np.array(sampled, dtype=np.int).T
 
     def generate_with_cf(self, h, start_id, sample_size):
         '''
@@ -198,7 +198,7 @@ class PeekyDecoder:
         # cf = sum_cf / sample_size  # mean
         # cf = min_cf
 
-        return np.array(sampled).T, cf
+        return np.array(sampled, dtype=np.int).T, cf
 
 
 class PeekySeq2seq(Seq2seq):

@@ -16,11 +16,13 @@ class Trainer:
         self.loss_list = []
         self.eval_interval = None
         self.current_epoch = 0
+        self.err_epoch = []  # errorを記録したエポック
         self.err_train = []
         self.err_test = []
 
     def fit(self, x_train, t_train, x_test, t_test, max_epoch=10, batch_size=32, max_grad=None, eval_interval=10):
         data_size = len(x_train)
+        batch_size = min(batch_size, data_size)
         max_iters = data_size // batch_size
         self.eval_interval = eval_interval
         model, optimizer = self.model, self.optimizer
@@ -51,28 +53,13 @@ class Trainer:
                 total_loss += loss
                 loss_count += 1
 
-                # 評価
-                # if (eval_interval is not None) and (iters % eval_interval) == 0:
-                #     avg_loss = total_loss / loss_count
-                #     elapsed_time = time.time() - start_time
-                #     print('| epoch %d |  iter %d / %d | time %d[s] | loss %.5f'
-                #           % (self.current_epoch + 1, iters + 1, max_iters, elapsed_time, avg_loss))
-                #     # self.loss_list.append(float(avg_loss))
-                #     total_loss, loss_count = 0, 0
-
-
             def get_error_rate(xs, ts):
                 data_size = xs.shape[0]
-                max_iter, mod = divmod(data_size, batch_size)
+                max_iter = -(-data_size // batch_size)  # 切り上げ整数
                 acc_count = 0  # 正答数
                 for iters in range(max_iter):
                     batch_x = xs[iters*batch_size:(iters+1)*batch_size]
-                    batch_t =ts[iters*batch_size:(iters+1)*batch_size]
-                    acc_count += self.model.validate(batch_x, batch_t)
-                # データサイズがバッチサイズで割りきれない場合
-                if mod > 0:
-                    batch_x = xs[max_iter*batch_size:]
-                    batch_t = ts[max_iter*batch_size:]
+                    batch_t = ts[iters*batch_size:(iters+1)*batch_size]
                     acc_count += self.model.validate(batch_x, batch_t)
 
                 return 1 - acc_count / data_size
@@ -87,12 +74,17 @@ class Trainer:
                   % (display_epoch, elapsed_time, total_time, self.loss_list[-1]))
 
             # errorの算出は5epochまではepoch毎、以降はeval_interval毎に行う
-            if (display_epoch <= 5) or (display_epoch == max_epoch) or (eval_interval is not None) and (display_epoch % eval_interval) == 0:
+            if (display_epoch <= 5)\
+                or (display_epoch == max_epoch)\
+                or (eval_interval is not None) and (display_epoch % eval_interval) == 0:
+                self.err_epoch.append(display_epoch)
+                # 訓練誤差の算出と記録
                 self.err_train.append(get_error_rate(x_train, t_train))
                 elapsed_time = time.time() - epoch_start_time
                 total_time = time.time() - start_time
                 print('| epoch %d | time/total %d/%d[s] | train error = %.5f'
                       % (display_epoch, elapsed_time, total_time, self.err_train[-1]))
+                # テスト誤差の算出と記録
                 self.err_test.append(get_error_rate(x_test, t_test))
                 elapsed_time = time.time() - epoch_start_time
                 total_time = time.time() - start_time
@@ -102,15 +94,27 @@ class Trainer:
             self.current_epoch += 1
 
     def plot(self, image_path=None, log_scale=False):
-        fig, ax1 = plt.subplots()
+        '''
+        loss(ax1)とerror(ax2)を同じグラフの別軸上にプロットする
+        ax2には訓練誤差とテスト誤差を併記する
+
+        Parameters
+        ----------
+        image_path : str, optional
+            プロットしたグラフの保存先
+            (the default is None, which 保存しない)
+        log_scale : bool, optional
+            縦軸を対数スケールにするかどうか
+        '''
+
+        _, ax1 = plt.subplots()
         ax2 = ax1.twinx()
 
         # 色の設定
         color_loss = 'blue'
         color_err = 'orange'
-        epoch_range = range(1, len(self.loss_list)+1)
-        x1 = numpy.array(epoch_range)
-        x2 = numpy.array([x for x in epoch_range if x <= 5 or x == len(self.loss_list) or x % self.eval_interval == 0])
+        x1 = numpy.array(range(1, len(self.loss_list)+1))
+        x2 = self.err_epoch
         ax1.plot(x1, self.loss_list, color=color_loss, label='loss')
         ax2.plot(x2, self.err_train, color=color_err, label='train error')
         ax2.plot(x2, self.err_test, color=color_err, linestyle='dashed', label='test error')
@@ -126,7 +130,8 @@ class Trainer:
             ax2.set_ylim((0.0, 1.0))
         ax1.set_ylabel('Loss')
         ax2.set_ylabel('Error')
-        ax1.set_title("train error={:.5f}  test error={:.5f}".format(self.err_train[-1], self.err_test[-1]))
+        # タイトルに最終epochの誤差率を表示する
+        ax1.set_title("train error={:.5f}  test error={:.5f}".format(float(self.err_train[-1]), float(self.err_test[-1])))
         ax1.legend(bbox_to_anchor=(1, 1), loc='upper right')
         ax2.legend(bbox_to_anchor=(1, 0.9), loc='upper right')
         #グリッド表示(ax2のみ)

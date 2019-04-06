@@ -5,6 +5,7 @@
 # 品種翻訳
 LSTMを用いたseq2seqモデルで品種翻訳を学習する深層学習モデルです。
 
+## 目次
 - [ディレクトリ構成](#ディレクトリ構成)
 - [開発環境](#開発環境)
 - [プログラムの実行](#プログラムの実行)
@@ -19,28 +20,29 @@ LSTMを用いたseq2seqモデルで品種翻訳を学習する深層学習モデ
 ## ディレクトリ構成
 ```
 /
-├── README.md             <- The top-level README this project.
-├── dataset/              <- Dataset for seq2seq learning.
+├── README.md
+├── dataset/              <- 学習に用いるデータセット
 │   └── README.md         <- README for dataset.
-├── models/               <- Trained and serialized models.
+├── models/               <- 訓練済みモデルファイル
 ├── notebooks/            <- Jupyter notebooks.
-├── results/              <- Result CSV and plotting learning curve figure.
-├── requirements.txt      <- The requirements file.
+├── results/              <- 品種翻訳結果ファイルの出力先
+├── requirements.txt      <- 必要パッケージ
 └── src
-    ├── common/           <- Scripts for common functions, layers, and others.
-    ├── data/             <- Scripts to data wrangling.
-    ├── seq2seq.py        <- Scripts to seq2seq model.
-    └── train_seq2seq.py  <- Scripts to training seq2seq.
+    ├── common/           <- 基本レイヤや関数など
+    ├── data/             <- データ操作モジュール
+    ├── seq2seq.py        <- Seq2seqモデルクラス
+    └── train_seq2seq.py  <- Seq2seqの学習を実行するスクリプト
 ```
 
 ## 開発環境
-Python 3.6.2  
+Python 3.6.8  
 パッケージは以下の通りです。  
-```requirements.txt
+```
 numpy==1.14.3
 pandas==0.23.4
 matplotlib==3.0.2
 scikit-learn==0.20.1
+jupyter==1.0.0
 ```
 必要パッケージは以下のコマンドで一括インストールできます。
 ```bash
@@ -55,20 +57,21 @@ $ jupyter notebook
 ```
 
 [notebooks/train_seq2seq.ipynb](./notebooks/train_seq2seq.ipynb)を開いて、上から順にコードを実行すれば学習できます。  
-ハイパーパラメータやファイル名などは適宜変更してください。  
+ハイパーパラメータや入出力ファイル名などは適宜変更してください。  
 実行結果として、CSVと学習曲線のPNG画像を`results/`以下に保存し、  
 学習したパラメータを`models/`以下に保存します。
 
-
-CLIから実行する場合は、相対パスの都合でsrcディレクトリに移動してから実行してください。
+CLIから実行する場合は、srcディレクトリに移動してから`train_seq2seq.py`を実行してください。
 ```bash
 $ cd ./src
 $ python train_seq2seq.py
 ```
+モデル選択、エポック数、ハイパーパラメータなどはハードコーディングされています。
 
 ### 推論の実行
 学習と同様に、Jupyter Notebookから推論を実行できます。  
 [notebooks/inference_seq2seq.ipynb](./notebooks/inference_seq2seq.ipynb)を開いて、実行してください。  
+
 このとき、学習済みのパラメータを保存したpickleファイルが必要です。  
 pickleファイルが無いときは、先に学習を実行してください。  
 また、読み込むpickleファイルはハイパーパラメータが使用するモデルと一致している必要があります。  
