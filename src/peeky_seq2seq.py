@@ -2,7 +2,7 @@
 from common.time_layers import *
 from common.base_model import BaseModel
 from functools import partial
-from seq2seq import Encoder, Seq2seq, _init_parameter
+from seq2seq import Encoder, BiEncoder, Seq2seq, _init_parameter
 
 class PeekyDecoder:
     '''
@@ -129,7 +129,7 @@ class PeekyDecoder:
             char_id = score.argmax(axis=2)
             sampled.append(char_id.flatten())
 
-        return np.array(sampled).T
+        return np.array(sampled, dtype=np.int).T
 
     def generate_with_cf(self, h, start_id, sample_size):
         '''
@@ -198,7 +198,7 @@ class PeekyDecoder:
         # cf = sum_cf / sample_size  # mean
         # cf = min_cf
 
-        return np.array(sampled).T, cf
+        return np.array(sampled, dtype=np.int).T, cf
 
 
 class PeekySeq2seq(Seq2seq):
@@ -207,11 +207,25 @@ class PeekySeq2seq(Seq2seq):
     相違点はDecoderレイヤがPeekyDecoderレイヤに差し替わっただけである
     '''
 
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
         V, D, H = vocab_size, wordvec_size, hidden_size
         self.encoder = Encoder(V, D, H)
         self.decoder = PeekyDecoder(V, D, H)
-        self.loss = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
+
+        self.params = self.encoder.params + self.decoder.params
+        self.grads = self.encoder.grads + self.decoder.grads
+
+class PeekySeq2seqBiLSTM(Seq2seq):
+    '''
+    Encoderに双方向LSTMを採用したPeekySeq2seq
+    '''
+
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
+        V, D, H = vocab_size, wordvec_size, hidden_size
+        self.encoder = BiEncoder(V, D, H)
+        self.decoder = PeekyDecoder(V, D, H)
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads

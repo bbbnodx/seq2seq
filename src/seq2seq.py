@@ -42,7 +42,6 @@ class Encoder:
     通常のLSTMとほぼ同じだが、順伝播の出力として
     最後の隠れ状態を返すところが異なる
     '''
-
     def __init__(self, vocab_size, wordvec_size, hidden_size):
         V, D, H = vocab_size, wordvec_size, hidden_size
 
@@ -72,6 +71,24 @@ class Encoder:
         dout = self.embed.backward(dout)
 
         return dout
+
+class BiEncoder(Encoder):
+    '''双方向LSTMによるEncoder
+    '''
+    def __init__(self, vocab_size, wordvec_size, hidden_size):
+        # 単方向LSTMと出力サイズを合わせるため、隠れ層の次元数を半分にする
+        V, D, H = vocab_size, wordvec_size, hidden_size // 2
+
+        # Encoder内部レイヤのパラメータを初期化する
+        embed_W, lstm_Wx1, lstm_Wh1, lstm_b1, _, _ = _init_parameter(V, D, H)
+        _, lstm_Wx2, lstm_Wh2, lstm_b2, _, _ = _init_parameter(V, D, H)
+
+        self.embed = TimeEmbedding(embed_W)
+        self.lstm = TimeBiLSTM(lstm_Wx1, lstm_Wh1, lstm_b1, lstm_Wx2, lstm_Wh2, lstm_b2, stateful=False)
+
+        self.params = self.embed.params + self.lstm.params
+        self.grads = self.embed.grads + self.lstm.grads
+        self.hs = None
 
 class Decoder:
     '''
@@ -166,7 +183,7 @@ class Decoder:
             char_id = score.argmax(axis=2)
             sampled.append(char_id.flatten())
 
-        return np.array(sampled).T
+        return np.array(sampled, dtype=np.int).T
 
     def generate_with_cf(self, h, start_id, sample_size):
         '''
@@ -196,7 +213,8 @@ class Decoder:
         self.lstm.set_state(h)
 
         ### 確信度の取得用 ###
-        sum_cf = 0
+        sum_cf = np.zeros(N)
+        counts = np.zeros(N, dtype=np.int)
         softmax = TimeSoftmax()
         ##########
 
@@ -213,12 +231,14 @@ class Decoder:
             sampled.append(char_id.flatten())
 
             ### 確信度の加算 ###
-            sum_cf += score.max(axis=2).flatten()
+            mask = (char_id.flatten() != 0)
+            sum_cf[mask] += score.max(axis=2).flatten()[mask]
+            counts += mask
             ##########
 
-        cf = sum_cf / sample_size  # mean
+        cf = sum_cf / counts  # mean
 
-        return np.array(sampled).T, cf
+        return np.array(sampled, dtype=np.int).T, cf
 
 
 class Seq2seq(BaseModel):
@@ -227,11 +247,11 @@ class Seq2seq(BaseModel):
     改良モデルの基底クラスでもあり、__init__以外のメソッドは共用する
     '''
 
-    def __init__(self, vocab_size, wordvec_size, hidden_size):
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
         V, D, H = vocab_size, wordvec_size, hidden_size
         self.encoder = Encoder(V, D, H)
         self.decoder = Decoder(V, D, H)
-        self.loss = TimeSoftmaxWithLoss()
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
 
         self.params = self.encoder.params + self.decoder.params
         self.grads = self.encoder.grads + self.decoder.grads
@@ -307,7 +327,7 @@ class Seq2seq(BaseModel):
 
         return sampled, cf
 
-    def validation(self, xs, ts):
+    def validate(self, xs, ts):
         '''
         xsから推論を行い、tsと比較して正解数を返す
 
@@ -334,3 +354,17 @@ class Seq2seq(BaseModel):
         valid_sequence = reduce(np.logical_and, (correct == guess).T)
         # 総和をとってバッチデータの正解数を返す
         return valid_sequence.sum()
+
+class Seq2seqBiLSTM(Seq2seq):
+    '''
+    Encoderに双方向LSTMを採用したSeq2seq
+    '''
+
+    def __init__(self, vocab_size, wordvec_size, hidden_size, ignore_index=-1):
+        V, D, H = vocab_size, wordvec_size, hidden_size
+        self.encoder = BiEncoder(V, D, H)
+        self.decoder = Decoder(V, D, H)
+        self.loss = TimeSoftmaxWithLoss(ignore_index=ignore_index)
+
+        self.params = self.encoder.params + self.decoder.params
+        self.grads = self.encoder.grads + self.decoder.grads

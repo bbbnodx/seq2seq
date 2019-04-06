@@ -1,13 +1,10 @@
 # coding: utf-8
-import sys
-sys.path.append('..')
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from data.sequence import TextSequence
 from common.optimizer import Adam
 from common.trainer import Trainer
-from common.util import eval_seq2seq
 from seq2seq import Seq2seq
 from peeky_seq2seq import PeekySeq2seq
 from attention_seq2seq import AttentionSeq2seq
@@ -27,7 +24,7 @@ char_to_id, id_to_char = seq.vocab
 
 # ハイパーパラメータ
 vocab_size = len(char_to_id)
-wordvec_size = 64
+wordvec_size = 128
 hidden_size = 128
 batch_size = 32
 max_epoch = 50
@@ -39,7 +36,7 @@ x, t = seq.shuffle(seed=1)
 # K-分割交差法(test_size = 1/K)
 K = 4
 
-for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, test_size=1/K)):
+for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, K=K)):
     # モデル選択(パラメータの初期化)
     # model = Seq2seq(vocab_size, wordvec_size, hidden_size)
     model = PeekySeq2seq(vocab_size, wordvec_size, hidden_size)
@@ -55,7 +52,7 @@ for i, (x_train, x_test, t_train, t_test) in enumerate(seq.cv_dataset_gen(x, t, 
 
     # Inference
     start_id = seq.start_id
-    sample_size = seq.t_length
+    sample_size = seq.sample_size
     guess_train = model.generate(x_train, start_id, sample_size)
     guess_test = model.generate(x_test, start_id, sample_size)
 
